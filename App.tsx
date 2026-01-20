@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Contract, FilterState } from './types';
 import FiscalTaggingForm from './components/FiscalTaggingForm';
 import Dashboard from './components/Dashboard';
@@ -161,6 +162,16 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-4 md:gap-6">
+            {/* New Contract Button */}
+            <Link
+              to="/generator"
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all font-bold text-xs shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            >
+              <i className="fas fa-magic mr-2"></i>
+              <span className="hidden md:inline">Novo Contrato</span>
+              <span className="md:hidden">Novo</span>
+            </Link>
+            
             {/* View Toggle */}
             <div className="flex bg-gray-100 rounded-lg p-1">
               <button
