@@ -124,14 +124,15 @@ const App: React.FC = () => {
       <ToastContainer toasts={toasts} onClose={removeToast} />
 
       {/* Header */}
-      <nav className="bg-white text-gray-900 p-4 shadow-sm border-b sticky top-0 z-50">
-        <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-4 md:gap-6">
+      <nav className="bg-white text-gray-900 p-4 shadow-sm border-b sticky top-0 z-50" style={{ backgroundColor: 'white', padding: '1rem', borderBottom: '1px solid #e5e7eb' }}>
+        <div className="container mx-auto flex justify-between items-center" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1280px', margin: '0 auto' }}>
+          <div className="flex items-center gap-4 md:gap-6" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div className="flex items-center">
               <img 
                 src={kionLogoUrl} 
                 alt="KION Group Logo" 
                 className="h-10 md:h-12 w-auto min-w-[100px] md:min-w-[140px] object-contain"
+                style={{ height: '48px', width: 'auto', maxWidth: '140px', objectFit: 'contain' }}
               />
             </div>
             <div className="h-8 w-px bg-gray-200 hidden sm:block"></div>
@@ -361,11 +362,12 @@ const App: React.FC = () => {
 
       {/* Footer */}
       <footer className="mt-12 border-t py-8 md:py-12 text-center text-slate-600 text-[10px] uppercase font-black tracking-[0.2em] bg-white">
-        <div className="flex justify-center mb-6">
+        <div className="flex justify-center mb-6" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
           <img 
             src={kionLogoUrl} 
             alt="KION Logo Footer" 
             className="h-8 w-auto grayscale contrast-125 opacity-60 hover:opacity-100 transition-all cursor-pointer" 
+            style={{ height: '32px', width: 'auto', maxWidth: '120px', filter: 'grayscale(1)', opacity: '0.6' }}
           />
         </div>
         <p className="mb-2">KION SOUTH AMERICA • LEGALTECH DIVISION</p>
