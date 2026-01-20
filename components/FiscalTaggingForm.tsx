@@ -6,8 +6,8 @@ import { analyzeContractFiscalImpact } from '../services/fiscalRules';
 import { formatNCM, isValidNCM, formatCurrency, parseCurrency } from '../utils/formatters';
 
 interface Props {
-  onAdd: (contract: Contract) => void;
-  onUpdate?: (contract: Contract) => void;
+  onAdd: (contract: Omit<Contract, 'id' | 'createdAt' | 'updatedAt' | 'history'>) => void | Promise<void>;
+  onUpdate?: (contract: Contract) => void | Promise<void>;
   editingContract?: Contract | null;
   onCancelEdit?: () => void;
 }
@@ -74,36 +74,37 @@ const FiscalTaggingForm: React.FC<Props> = ({ onAdd, onUpdate, editingContract, 
 
     setIsSubmitting(true);
 
-    // Simular delay de rede
-    await new Promise(resolve => setTimeout(resolve, 300));
+    try {
+      if (editingContract && onUpdate) {
+        // Atualizar contrato existente
+        const updatedContract: Contract = {
+          ...editingContract,
+          ...formData,
+        } as Contract;
+        await onUpdate(updatedContract);
+      } else {
+        // Criar novo contrato (sem id, createdAt, etc. - o banco gera)
+        const newContractData = {
+          contractNumber: formData.contractNumber!,
+          partyName: formData.partyName!,
+          value: formData.value || 0,
+          ncm: formData.ncm!,
+          originState: formData.originState || 'SP',
+          destinationState: formData.destinationState || 'SP',
+          operationType: formData.operationType!,
+          expiryDate: formData.expiryDate || '',
+          status: formData.status || 'Ativo'
+        };
+        await onAdd(newContractData as Omit<Contract, 'id' | 'createdAt' | 'updatedAt' | 'history'>);
+      }
 
-    const now = new Date().toISOString();
-
-    if (editingContract && onUpdate) {
-      const updatedContract: Contract = {
-        ...editingContract,
-        ...formData,
-        updatedAt: now,
-        history: [
-          ...(editingContract.history || []),
-          ...getChanges(editingContract, formData as Contract)
-        ]
-      } as Contract;
-      onUpdate(updatedContract);
-    } else {
-      const newContract: Contract = {
-        ...formData,
-        id: uuidv4(),
-        createdAt: now,
-        updatedAt: now,
-        history: []
-      } as Contract;
-      onAdd(newContract);
+      resetForm();
+      if (onCancelEdit) onCancelEdit();
+    } catch (err) {
+      console.error('Erro ao salvar contrato:', err);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    resetForm();
-    setIsSubmitting(false);
-    if (onCancelEdit) onCancelEdit();
   };
 
   const getChanges = (oldContract: Contract, newContract: Contract) => {

@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { Contract, FilterState } from './types';
-import { INITIAL_CONTRACTS } from './constants';
 import FiscalTaggingForm from './components/FiscalTaggingForm';
 import Dashboard from './components/Dashboard';
 import ContractFilters from './components/ContractFilters';
@@ -9,23 +8,31 @@ import Modal from './components/Modal';
 import ConfirmModal from './components/ConfirmModal';
 import ChatBot from './components/ChatBot';
 import { ToastContainer } from './components/Toast';
-import { useLocalStorage } from './hooks/useLocalStorage';
+import { useContracts } from './hooks/useContracts';
 import { useToast } from './hooks/useToast';
 import { analyzeContractFiscalImpact } from './services/fiscalRules';
-import { formatCurrency, formatDate, exportToCSV } from './utils/formatters';
+import { formatCurrency, exportToCSV } from './utils/formatters';
 import kionLogoUrl from './logo.png';
 
 type ViewMode = 'table' | 'dashboard';
 
 const App: React.FC = () => {
-  // Estado persistido no localStorage
-  const [contracts, setContracts] = useLocalStorage<Contract[]>('kion-contracts', INITIAL_CONTRACTS);
+  // Estado persistido no Supabase
+  const { 
+    contracts, 
+    loading: contractsLoading, 
+    error: contractsError,
+    addContract: addContractToDb, 
+    updateContract: updateContractInDb, 
+    deleteContract: deleteContractFromDb,
+    refetch 
+  } = useContracts();
   
   // Estados locais
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
   const [historyContract, setHistoryContract] = useState<Contract | null>(null);
-  const [deleteContract, setDeleteContract] = useState<Contract | null>(null);
+  const [contractToDelete, setContractToDelete] = useState<Contract | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     status: '',
@@ -68,22 +75,34 @@ const App: React.FC = () => {
   }, [contracts, filters]);
 
   // Handlers
-  const addContract = (c: Contract) => {
-    setContracts([c, ...contracts]);
-    success('Contrato registrado com sucesso!');
+  const handleAddContract = async (contractData: Omit<Contract, 'id' | 'createdAt' | 'updatedAt' | 'history'>) => {
+    const result = await addContractToDb(contractData);
+    if (result) {
+      success('Contrato registrado com sucesso!');
+    } else {
+      error('Erro ao registrar contrato');
+    }
   };
 
-  const updateContract = (updated: Contract) => {
-    setContracts(contracts.map(c => c.id === updated.id ? updated : c));
-    setEditingContract(null);
-    success('Contrato atualizado com sucesso!');
+  const handleUpdateContract = async (updated: Contract) => {
+    const result = await updateContractInDb(updated);
+    if (result) {
+      setEditingContract(null);
+      success('Contrato atualizado com sucesso!');
+    } else {
+      error('Erro ao atualizar contrato');
+    }
   };
 
-  const handleDelete = () => {
-    if (deleteContract) {
-      setContracts(contracts.filter(c => c.id !== deleteContract.id));
-      success('Contrato excluído com sucesso!');
-      setDeleteContract(null);
+  const handleDelete = async () => {
+    if (contractToDelete) {
+      const result = await deleteContractFromDb(contractToDelete.id);
+      if (result) {
+        success('Contrato excluído com sucesso!');
+      } else {
+        error('Erro ao excluir contrato');
+      }
+      setContractToDelete(null);
     }
   };
 
@@ -206,8 +225,8 @@ const App: React.FC = () => {
             {/* Left Column: Form */}
             <div className="lg:col-span-1 order-2 lg:order-1">
               <FiscalTaggingForm 
-                onAdd={addContract} 
-                onUpdate={updateContract}
+                onAdd={handleAddContract} 
+                onUpdate={handleUpdateContract}
                 editingContract={editingContract}
                 onCancelEdit={() => setEditingContract(null)}
               />
@@ -274,7 +293,28 @@ const App: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredContracts.length === 0 ? (
+                      {contractsLoading ? (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                            <i className="fas fa-spinner fa-spin text-4xl mb-3 block text-blue-500"></i>
+                            <p className="font-bold">Carregando contratos...</p>
+                          </td>
+                        </tr>
+                      ) : contractsError ? (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-12 text-center text-red-500">
+                            <i className="fas fa-exclamation-triangle text-4xl mb-3 block"></i>
+                            <p className="font-bold">Erro ao carregar contratos</p>
+                            <p className="text-sm">{contractsError}</p>
+                            <button 
+                              onClick={refetch}
+                              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                              Tentar novamente
+                            </button>
+                          </td>
+                        </tr>
+                      ) : filteredContracts.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                             <i className="fas fa-inbox text-4xl mb-3 block"></i>
@@ -339,7 +379,7 @@ const App: React.FC = () => {
                                     <i className="fas fa-edit"></i>
                                   </button>
                                   <button
-                                    onClick={() => setDeleteContract(contract)}
+                                    onClick={() => setContractToDelete(contract)}
                                     className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                                     title="Excluir"
                                   >
@@ -388,11 +428,11 @@ const App: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       <ConfirmModal
-        isOpen={!!deleteContract}
-        onClose={() => setDeleteContract(null)}
+        isOpen={!!contractToDelete}
+        onClose={() => setContractToDelete(null)}
         onConfirm={handleDelete}
         title="Excluir Contrato"
-        message={`Tem certeza que deseja excluir o contrato "${deleteContract?.contractNumber}"? Esta ação não pode ser desfeita.`}
+        message={`Tem certeza que deseja excluir o contrato "${contractToDelete?.contractNumber}"? Esta ação não pode ser desfeita.`}
         confirmText="Excluir"
         cancelText="Cancelar"
         type="danger"
