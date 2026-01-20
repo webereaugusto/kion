@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ContractDraft, ContractDraftType, EquipmentCategory, KionBrand, WizardStep, ContractClause, AISuggestion, Approver } from '../types';
 import { useContractDrafts } from '../hooks/useContractDrafts';
 import { useToast } from '../hooks/useToast';
+import { usePageTracker } from '../hooks/usePageTracker';
 import { generateSuggestedClauses, generateEquipmentDescription } from '../services/contractAI';
 import { downloadContractPDF } from '../services/pdfGenerator';
 import { formatCurrency } from '../utils/formatters';
@@ -24,6 +25,9 @@ const INITIAL_STEPS: WizardStep[] = [
 ];
 
 const ContractGenerator: React.FC = () => {
+  // Analytics tracking
+  usePageTracker('Gerador de Contratos');
+
   const { drafts, createDraft, updateDraft, submitForApproval, loading } = useContractDrafts();
   const { toasts, removeToast, success, error } = useToast();
 

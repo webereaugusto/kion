@@ -11,6 +11,7 @@ import ChatBot from './components/ChatBot';
 import { ToastContainer } from './components/Toast';
 import { useContracts } from './hooks/useContracts';
 import { useToast } from './hooks/useToast';
+import { usePageTracker } from './hooks/usePageTracker';
 import { analyzeContractFiscalImpact } from './services/fiscalRules';
 import { formatCurrency, exportToCSV } from './utils/formatters';
 import kionLogoUrl from './logo.png';
@@ -18,6 +19,9 @@ import kionLogoUrl from './logo.png';
 type ViewMode = 'table' | 'dashboard';
 
 const App: React.FC = () => {
+  // Analytics tracking
+  usePageTracker('KION CLM - Gestão de Contratos');
+
   // Estado persistido no Supabase
   const { 
     contracts, 

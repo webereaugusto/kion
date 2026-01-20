@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import App from './App';
 import ContractGenerator from './pages/ContractGenerator';
 import ContractPublicView from './pages/ContractPublicView';
+import Analytics from './pages/Analytics';
 import './src/index.css';
 
 const rootElement = document.getElementById('root');
@@ -19,6 +20,7 @@ root.render(
         <Route path="/" element={<App />} />
         <Route path="/generator" element={<ContractGenerator />} />
         <Route path="/contract/:shareToken" element={<ContractPublicView />} />
+        <Route path="/analytics" element={<Analytics />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>

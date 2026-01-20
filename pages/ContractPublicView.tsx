@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ContractDraft, Approver } from '../types';
 import { useContractDrafts } from '../hooks/useContractDrafts';
+import { usePageTracker } from '../hooks/usePageTracker';
 import { downloadContractPDF } from '../services/pdfGenerator';
 import { formatCurrency } from '../utils/formatters';
 import ContractPreview from '../components/generator/ContractPreview';
 import kionLogoUrl from '../logo.png';
 
 const ContractPublicView: React.FC = () => {
+  // Analytics tracking
+  usePageTracker('Visualização de Contrato');
+
   const { shareToken } = useParams<{ shareToken: string }>();
   const { fetchDraftByShareToken, approveDraft, rejectDraft } = useContractDrafts();
   
