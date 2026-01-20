@@ -1,39 +1,132 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { OperationType, Contract } from '../types';
 import { BRAZILIAN_STATES } from '../constants';
 import { analyzeContractFiscalImpact } from '../services/fiscalRules';
+import { formatNCM, isValidNCM, formatCurrency, parseCurrency } from '../utils/formatters';
 
 interface Props {
   onAdd: (contract: Contract) => void;
+  onUpdate?: (contract: Contract) => void;
+  editingContract?: Contract | null;
+  onCancelEdit?: () => void;
 }
 
-const FiscalTaggingForm: React.FC<Props> = ({ onAdd }) => {
+const FiscalTaggingForm: React.FC<Props> = ({ onAdd, onUpdate, editingContract, onCancelEdit }) => {
   const [formData, setFormData] = useState<Partial<Contract>>({
     operationType: OperationType.SALE,
     originState: 'SP',
     destinationState: 'SP',
     status: 'Ativo',
-    value: 0
+    value: 0,
+    expiryDate: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.contractNumber || !formData.partyName || !formData.ncm) return;
-    
-    const newContract = {
-      ...formData,
-      id: Math.random().toString(36).substr(2, 9),
-    } as Contract;
-    
-    onAdd(newContract);
+  const [displayValue, setDisplayValue] = useState('');
+  const [ncmError, setNcmError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Carregar dados ao editar
+  useEffect(() => {
+    if (editingContract) {
+      setFormData(editingContract);
+      setDisplayValue(formatCurrency(editingContract.value));
+    } else {
+      resetForm();
+    }
+  }, [editingContract]);
+
+  const resetForm = () => {
     setFormData({
       operationType: OperationType.SALE,
       originState: 'SP',
       destinationState: 'SP',
       status: 'Ativo',
-      value: 0
+      value: 0,
+      expiryDate: ''
     });
+    setDisplayValue('');
+    setNcmError('');
+  };
+
+  const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '');
+    const numValue = parseInt(raw || '0') / 100;
+    setFormData({ ...formData, value: numValue });
+    setDisplayValue(formatCurrency(numValue));
+  };
+
+  const handleNCMChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatNCM(e.target.value);
+    setFormData({ ...formData, ncm: formatted });
+    
+    if (formatted && !isValidNCM(formatted)) {
+      setNcmError('NCM deve ter 8 dígitos (ex: 8427.20.10)');
+    } else {
+      setNcmError('');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.contractNumber || !formData.partyName || !formData.ncm) return;
+    if (ncmError) return;
+
+    setIsSubmitting(true);
+
+    // Simular delay de rede
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    const now = new Date().toISOString();
+
+    if (editingContract && onUpdate) {
+      const updatedContract: Contract = {
+        ...editingContract,
+        ...formData,
+        updatedAt: now,
+        history: [
+          ...(editingContract.history || []),
+          ...getChanges(editingContract, formData as Contract)
+        ]
+      } as Contract;
+      onUpdate(updatedContract);
+    } else {
+      const newContract: Contract = {
+        ...formData,
+        id: uuidv4(),
+        createdAt: now,
+        updatedAt: now,
+        history: []
+      } as Contract;
+      onAdd(newContract);
+    }
+
+    resetForm();
+    setIsSubmitting(false);
+    if (onCancelEdit) onCancelEdit();
+  };
+
+  const getChanges = (oldContract: Contract, newContract: Contract) => {
+    const changes: Contract['history'] = [];
+    const fieldsToTrack = ['contractNumber', 'partyName', 'value', 'ncm', 'originState', 'destinationState', 'operationType', 'status', 'expiryDate'];
+    
+    fieldsToTrack.forEach(field => {
+      const oldVal = String(oldContract[field as keyof Contract] || '');
+      const newVal = String(newContract[field as keyof Contract] || '');
+      if (oldVal !== newVal) {
+        changes.push({
+          id: uuidv4(),
+          contractId: oldContract.id,
+          field,
+          oldValue: oldVal,
+          newValue: newVal,
+          changedAt: new Date().toISOString(),
+          changedBy: 'Usuário Sistema'
+        });
+      }
+    });
+
+    return changes;
   };
 
   const currentAlerts = formData.ncm ? analyzeContractFiscalImpact(formData as Contract) : [];
@@ -42,13 +135,24 @@ const FiscalTaggingForm: React.FC<Props> = ({ onAdd }) => {
   const labelClasses = "block text-xs font-black text-slate-700 uppercase tracking-wider";
 
   return (
-    <div className="bg-white p-8 rounded-xl shadow-xl border border-gray-100">
-      <h3 className="text-xl font-black mb-6 text-slate-900 flex items-center gap-3">
-        <div className="bg-blue-600 p-2 rounded-lg">
-          <i className="fas fa-file-invoice-dollar text-white text-sm"></i>
-        </div>
-        Novo Registro Jurídico-Fiscal
-      </h3>
+    <div className="bg-white p-6 md:p-8 rounded-xl shadow-xl border border-gray-100">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-lg md:text-xl font-black text-slate-900 flex items-center gap-3">
+          <div className="bg-blue-600 p-2 rounded-lg">
+            <i className={`fas ${editingContract ? 'fa-edit' : 'fa-file-invoice-dollar'} text-white text-sm`}></i>
+          </div>
+          {editingContract ? 'Editar Contrato' : 'Novo Registro Jurídico-Fiscal'}
+        </h3>
+        {editingContract && onCancelEdit && (
+          <button
+            type="button"
+            onClick={onCancelEdit}
+            className="text-gray-500 hover:text-gray-700 p-2"
+          >
+            <i className="fas fa-times"></i>
+          </button>
+        )}
+      </div>
       
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5">
         <div>
@@ -80,37 +184,55 @@ const FiscalTaggingForm: React.FC<Props> = ({ onAdd }) => {
             <label className={labelClasses}>NCM do Equipamento</label>
             <input 
               type="text" 
-              className={inputClasses}
+              className={`${inputClasses} ${ncmError ? 'border-red-400 focus:border-red-500' : ''}`}
               placeholder="Ex: 8427.20.10"
               required
               value={formData.ncm || ''}
-              onChange={e => setFormData({...formData, ncm: e.target.value})}
+              onChange={handleNCMChange}
+              maxLength={10}
             />
+            {ncmError && (
+              <p className="text-red-500 text-xs mt-1">{ncmError}</p>
+            )}
           </div>
           <div>
             <label className={labelClasses}>Valor Estimado (BRL)</label>
             <input 
-              type="number" 
+              type="text" 
               className={inputClasses}
-              placeholder="0,00"
+              placeholder="R$ 0,00"
               required
-              value={formData.value || ''}
-              onChange={e => setFormData({...formData, value: parseFloat(e.target.value)})}
+              value={displayValue}
+              onChange={handleValueChange}
             />
           </div>
         </div>
 
-        <div>
-          <label className={labelClasses}>Tipo de Operação</label>
-          <select 
-            className={inputClasses}
-            value={formData.operationType}
-            onChange={e => setFormData({...formData, operationType: e.target.value as OperationType})}
-          >
-            {Object.values(OperationType).map(type => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </select>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClasses}>Tipo de Operação</label>
+            <select 
+              className={inputClasses}
+              value={formData.operationType}
+              onChange={e => setFormData({...formData, operationType: e.target.value as OperationType})}
+            >
+              {Object.values(OperationType).map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClasses}>Status</label>
+            <select 
+              className={inputClasses}
+              value={formData.status}
+              onChange={e => setFormData({...formData, status: e.target.value as Contract['status']})}
+            >
+              <option value="Ativo">Ativo</option>
+              <option value="Vencendo">Vencendo</option>
+              <option value="Encerrado">Encerrado</option>
+            </select>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -136,13 +258,42 @@ const FiscalTaggingForm: React.FC<Props> = ({ onAdd }) => {
           </div>
         </div>
 
-        <div className="pt-2">
-           <button 
+        <div>
+          <label className={labelClasses}>Data de Vencimento</label>
+          <input 
+            type="date" 
+            className={inputClasses}
+            value={formData.expiryDate || ''}
+            onChange={e => setFormData({...formData, expiryDate: e.target.value})}
+          />
+        </div>
+
+        <div className="pt-2 flex gap-3">
+          {editingContract && onCancelEdit && (
+            <button 
+              type="button"
+              onClick={onCancelEdit}
+              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-black py-4 px-4 rounded-xl transition-all flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
+            >
+              <i className="fas fa-times"></i> Cancelar
+            </button>
+          )}
+          <button 
             type="submit"
-            className="w-full bg-blue-700 hover:bg-blue-800 text-white font-black py-4 px-4 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-[0.98] flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
-           >
-             <i className="fas fa-check-double"></i> Registrar no Workflow Fiscal
-           </button>
+            disabled={isSubmitting || !!ncmError}
+            className="flex-1 bg-blue-700 hover:bg-blue-800 disabled:bg-blue-400 text-white font-black py-4 px-4 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-[0.98] flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
+          >
+            {isSubmitting ? (
+              <>
+                <i className="fas fa-spinner fa-spin"></i> Processando...
+              </>
+            ) : (
+              <>
+                <i className={`fas ${editingContract ? 'fa-save' : 'fa-check-double'}`}></i> 
+                {editingContract ? 'Salvar Alterações' : 'Registrar no Workflow Fiscal'}
+              </>
+            )}
+          </button>
         </div>
       </form>
 
@@ -150,18 +301,27 @@ const FiscalTaggingForm: React.FC<Props> = ({ onAdd }) => {
       {currentAlerts.length > 0 && (
         <div className="mt-8 p-5 bg-amber-50 border-2 border-amber-200 rounded-xl">
           <h4 className="font-black text-amber-900 mb-3 text-xs uppercase tracking-widest flex items-center gap-2">
-            <i className="fas fa-shield-alt"></i> Compliance Engine
+            <i className="fas fa-shield-alt"></i> Compliance Engine ({currentAlerts.length} alertas)
           </h4>
-          <ul className="space-y-4">
+          <ul className="space-y-3 max-h-64 overflow-y-auto">
             {currentAlerts.map((alert, idx) => (
               <li key={idx} className="bg-white/50 p-3 rounded-lg border border-amber-100">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter ${alert.type === 'Opportunity' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
-                    {alert.type === 'Opportunity' ? 'Oportunidade' : 'Risco'}
+                  <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter ${
+                    alert.type === 'Opportunity' ? 'bg-emerald-600 text-white' : 
+                    alert.type === 'Risk' ? 'bg-red-600 text-white' : 
+                    'bg-blue-600 text-white'
+                  }`}>
+                    {alert.type === 'Opportunity' ? 'Oportunidade' : alert.type === 'Risk' ? 'Risco' : 'Info'}
                   </span>
-                  <span className="text-xs font-black text-slate-800">{alert.message}</span>
+                  {alert.code && (
+                    <span className="text-[10px] font-mono bg-gray-200 px-1.5 py-0.5 rounded">
+                      {alert.code}
+                    </span>
+                  )}
                 </div>
-                <div className="text-[10px] text-slate-600 font-bold ml-1 leading-relaxed">— {alert.impact}</div>
+                <div className="text-xs font-black text-slate-800">{alert.message}</div>
+                <div className="text-[10px] text-slate-600 font-bold mt-1 leading-relaxed">— {alert.impact}</div>
               </li>
             ))}
           </ul>
