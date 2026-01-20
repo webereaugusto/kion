@@ -7,6 +7,7 @@ import ContractFilters from './components/ContractFilters';
 import ContractHistory from './components/ContractHistory';
 import Modal from './components/Modal';
 import ConfirmModal from './components/ConfirmModal';
+import ChatBot from './components/ChatBot';
 import { ToastContainer } from './components/Toast';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useToast } from './hooks/useToast';
@@ -394,6 +395,9 @@ const App: React.FC = () => {
         cancelText="Cancelar"
         type="danger"
       />
+
+      {/* AI ChatBot */}
+      <ChatBot />
     </div>
   );
 };
