@@ -4,6 +4,7 @@ import { Contract } from './types';
 import { MOCK_CONTRACTS } from './constants';
 import FiscalTaggingForm from './components/FiscalTaggingForm';
 import { analyzeContractFiscalImpact } from './services/fiscalRules';
+import kionLogoUrl from './logo.png';
 
 const App: React.FC = () => {
   const [contracts, setContracts] = useState<Contract[]>(MOCK_CONTRACTS);
@@ -14,9 +15,6 @@ const App: React.FC = () => {
 
   const totalValue = contracts.reduce((acc, curr) => acc + curr.value, 0);
   const expiringCount = contracts.filter(c => c.status === 'Vencendo').length;
-
-  // URL do logo anexado pelo usuário
-  const kionLogoUrl = "input_file_0.png";
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
